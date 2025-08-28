@@ -2589,7 +2589,7 @@
 			var turn = {}; // Just an example entry for a basic TURN server 
 			turn.username = "openrelayproject";
 			turn.credential = "openrelayproject";
-			turn.urls = ["turn:openrelay.metered.ca:443"]; 
+			turn.urls = ["turn:openrelay.metered.ca:443?transport=tcp"]; 
 			session.configuration.iceServers.push(turn);
 			//
 			// turn = {}; // second turn server example entry. 
