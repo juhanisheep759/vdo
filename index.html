@@ -2582,15 +2582,15 @@
 			session.stunServers = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun.cloudflare.com:3478"]}]; // google + cloudflare stun servers. default
 			
 			///////////////  ------  Custom basic TURN SETUP SECTION STARTS Here --------
-			// session.configuration = {         // uncomment to disable the default usage of the vdo.ninja turn servers.
-			//	iceServers: session.stunServers,
-			//	sdpSemantics: session.sdpSemantics
-			// };
-			// var turn = {}; // Just an example entry for a basic TURN server 
-			// turn.username = "steve";
-			// turn.credential = "justtesting";
-			// turn.urls = ["turn:turn.obs.ninja:443"]; 
-			// session.configuration.iceServers.push(turn);
+			session.configuration = {         // uncomment to disable the default usage of the vdo.ninja turn servers.
+			iceServers: session.stunServers,
+			sdpSemantics: session.sdpSemantics
+			};
+			var turn = {}; // Just an example entry for a basic TURN server 
+			turn.username = "openrelayproject";
+			turn.credential = "openrelayproject";
+			turn.urls = ["turn:openrelay.metered.ca:443"]; 
+			session.configuration.iceServers.push(turn);
 			//
 			// turn = {}; // second turn server example entry. 
 			// turn.username = "steve";
