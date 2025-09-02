@@ -35404,7 +35404,64 @@ function PCM16(stream){
 	
 	return PCM;
 }
-//// END OF PCM 16 SAVING CODE 
+
+async function startNewRecordingSegment(video, videoKbps = false, altUUID = false) {
+	try {
+		if (video.recorder && video.recorder.mediaRecorder && video.recorder.mediaRecorder.state !== "inactive") {
+			video.recorder.mediaRecorder.stop();
+		}
+	} catch(e) { errorlog(e); }
+
+	const timestamp = Date.now();
+	const filenameBase = (session.label || session.streamID || "recording").replace(/[\W]+/g,"_");
+	const filename = filenameBase.substring(0,200) + "_" + timestamp.toString();
+
+	video.recorder.filename = filename;
+
+	try { if (video.recorder.writer) await video.recorder.writer.close(); } catch(e){ errorlog(e); }
+
+	const {readable, writable} = new TransformStream({
+		transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
+	});
+	const writer = await writable.getWriter();
+	await readable.pipeTo(streamSaver.createWriteStream(filename + ".webm", video.recorder.stop));
+	video.recorder.writer = writer;
+
+	const options = {};
+	if (videoKbps) options.videoBitsPerSecond = parseInt(videoKbps*1024);
+
+	video.recorder.mediaRecorder = new MediaRecorder(video.srcObject, options);
+
+	video.recorder.mediaRecorder.ondataavailable = async function(event) {
+		if (event.data && event.data.size > 0 && video.recorder.writer){
+			await video.recorder.writer.write(event.data);
+		}
+	};
+
+	video.recorder.isRestarting = false;
+
+	video.recorder.mediaRecorder.onerror = async function(event){
+		errorlog(event);
+		if (!video.recorder.isRestarting) {
+			video.recorder.isRestarting = true;
+			warnlog("MediaRecorder error; restarting...");
+			await startNewRecordingSegment(video, videoKbps, altUUID);
+			video.recorder.isRestarting = false;
+		}
+	};
+
+	video.recorder.mediaRecorder.onstop = async function(event){
+		if (video.recording && !video.recorder.isRestarting) {
+			video.recorder.isRestarting = true;
+			warnlog("MediaRecorder stopped unexpectedly; restarting...");
+			await startNewRecordingSegment(video, videoKbps, altUUID);
+			video.recorder.isRestarting = false;
+		}
+	};
+
+	video.recorder.mediaRecorder.start(1000); // 100ms chunks
+	log("Started new recording segment:", filename);
+}
 
 async function recordLocalVideo(action = null, videoKbps = false, remote=false, altUUID=false) { // event.currentTarget,this.parentNode.parentNode.dataset.UUID
 	
@@ -35430,11 +35487,13 @@ async function recordLocalVideo(action = null, videoKbps = false, remote=false, 
 	
 	if ("recording" in video) {
 		if (action == "estop") {
+			video.recording = false;
 			video.recorder.eStop();
 			warnlog("EMERGENCY Stopping RECORDING!");
 			video.recorder.stop();
 			return;
 		} else if (action == "stop") {
+			video.recording = false;
 			log("Stopping RECORDING!");
 			video.recorder.stop(); 
 			return;
@@ -35981,8 +36040,8 @@ async function recordLocalVideo(action = null, videoKbps = false, remote=false, 
 		console.log(writer);
 		readable.pipeTo(streamSaver.createWriteStream(filename.toString() + filext,  video.recorder.stop));
 		video.recorder.writer = writer;
-		
-		video.recorder.mediaRecorder.start(1000); // 100ms chunks
+
+		await startNewRecordingSegment(video, videoKbps, altUUID);
 		console.log("started recording");
 		
 		pokeIframeAPI("recording-started");
