@@ -35414,11 +35414,11 @@ async function startNewRecordingSegment(video, videoKbps = false, altUUID = fals
 
 	const timestamp = Date.now();
 	const filenameBase = (session.label || session.streamID || "recording").replace(/[\W]+/g,"_");
-	const filename = filenameBase.substring(0,200) + "_" + timestamp.toString();
+	const filename = filenameBase.substring(0,200) + "__" + timestamp.toString();
 
 	video.recorder.filename = filename;
 
-	try { if (video.recorder.writer) await video.recorder.writer.close(); } catch(e){ errorlog(e); }
+	try { if (video.recorder.writer) video.recorder.writer.close(); } catch(e){ errorlog(e); }
 
 	const {readable, writable} = new TransformStream({
 		transform: (chunk, ctrl) => chunk.arrayBuffer().then(b => ctrl.enqueue(new Uint8Array(b)))
@@ -35453,9 +35453,12 @@ async function startNewRecordingSegment(video, videoKbps = false, altUUID = fals
 	video.recorder.mediaRecorder.onstop = async function(event){
 		if (video.recording && !video.recorder.isRestarting) {
 			video.recorder.isRestarting = true;
-			warnlog("MediaRecorder stopped unexpectedly; restarting...");
-			await startNewRecordingSegment(video, videoKbps, altUUID);
-			video.recorder.isRestarting = false;
+			warnlog("MediaRecorder stopped; starting new segment...");
+
+			setTimeout(async () => {
+				await startNewRecordingSegment(video, videoKbps, altUUID);
+				video.recorder.isRestarting = false;
+			}, 500);
 		}
 	};
 
